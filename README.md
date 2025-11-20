@@ -40,8 +40,6 @@ Staphylococcus aureus · Vibrio cholerae · Helicobacter pylori · Streptococcus
 | 📊 Tabla | Tabla editable por archivo + resumen por organismo 
 | 📈 Gráfico | Barras comparativas de %GC promedio 
 | 🧠 Conclusión | Párrafo automático mayor vs menor GC + interpretación biológica 
-| 🗂️ Guion | Estructura para presentación (15 min) 
-| 🧯 Fragilidades | Riesgos del código y estrategias de mitigación 
 
 ---
 
