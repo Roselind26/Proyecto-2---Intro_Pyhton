@@ -24,10 +24,10 @@ Dashboard interactivo desarrollado en **Streamlit** para analizar el **contenido
 
 🧪 Organismos incluidos en el proyecto
 
-Base 
+Base: 
 Mycobacterium tuberculosis · Corynebacterium diphtheriae · Bacillus subtilis · Escherichia coli · Salmonella enterica · Pseudomonas aeruginosa · Clostridium botulinum · Borrelia burgdorferi · Mycoplasma genitalium
 
-Adicionales 
+Adicionales: 
 Staphylococcus aureus · Vibrio cholerae · Helicobacter pylori · Streptococcus pneumoniae · Listeria monocytogenes
 
 ---
