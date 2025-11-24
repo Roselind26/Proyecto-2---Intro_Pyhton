@@ -10,16 +10,16 @@ Funcionalidades principales:
 - Generar un gráfico de barras HORIZONTAL comparando el %GC.
 - Generar conclusiones automáticas:
     • Conclusión general (reglas simples).
-    • Conclusión generada por un agente de IA usando OpenAI (gpt-4o-mini).
+    • Conclusión generada por un agente de IA usando Gemini (Google).
 
 Requisitos de instalación (una sola vez):
-    py -3.12 -m pip install streamlit pandas matplotlib openai
+    py -3.12 -m pip install streamlit pandas matplotlib google-generativeai
 
 Para ejecutar el dashboard:
     py -3.12 -m streamlit run streamlit_app.py
 
-La API key de OpenAI se debe guardar en la variable de entorno:
-    OPENAI_API_KEY
+La API key de Gemini se puede guardar en el código (solo uso local)
+o en la variable de entorno GEMINI_API_KEY (mejor práctica).
 """
 
 import io
@@ -30,7 +30,7 @@ from typing import List, Dict, Tuple
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
-from openai import OpenAI  # Cliente oficial de OpenAI
+import google.generativeai as genai  # Cliente oficial de Gemini (Google)
 
 # -------------------------------------------------------------------
 # CONFIGURACIÓN GENERAL DEL DASHBOARD
@@ -41,89 +41,50 @@ plt.rcParams["font.family"] = "Times New Roman"
 st.title("GC% en 16S rRNA — Dashboard interactivo")
 st.caption(
     "Sube archivos FASTA, ajusta los umbrales de calidad, compara el %GC por organismo "
-    "y genera conclusiones automáticas (reglas + agente IA con OpenAI)."
+    "y genera conclusiones automáticas (reglas + agente IA con Gemini)."
 )
 
 # -------------------------------------------------------------------
-# CONFIGURACIÓN DEL CLIENTE OPENAI (AGENTE IA)
+# CONFIGURACIÓN DEL CLIENTE GEMINI (AGENTE IA)
 # -------------------------------------------------------------------
-def get_openai_client() -> OpenAI | None:
+def generar_conclusion_ia(df_sum: pd.DataFrame) -> str:
     """
-    Crea un cliente de OpenAI usando la variable de entorno OPENAI_API_KEY.
-    Si no está configurada o algo falla, devuelve None.
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    try:
-        client = OpenAI(api_key=api_key)
-        return client
-    except Exception:
-        return None
-
-
-def generar_conclusion_openai(df_sum: pd.DataFrame) -> str:
-    """
-    Usa el modelo gpt-4o-mini de OpenAI para generar una conclusión en español
+    Usa un modelo de Gemini para generar una conclusión en español
     basada en la tabla de resumen por organismo.
-
-    Si no hay API key o la petición falla, devuelve un mensaje explicativo.
     """
-    client = get_openai_client()
-    if client is None:
-        return (
-            "La funcionalidad de IA (OpenAI) no está disponible porque no se encontró "
-            "una API key válida en la variable de entorno 'OPENAI_API_KEY'."
-        )
+
+    api_key = "AIzaSyBnvvNgFSEopO1V92teBWrKP-ZZMeZOI3I"
+
+    if not api_key.strip():
+        return "No hay API key válida. Agrega la clave en la función generar_conclusion_ia()."
 
     if df_sum.empty or df_sum["GC_promedio"].isna().all():
         return "La IA no puede generar una conclusión porque no hay datos válidos en el resumen por organismo."
 
-    # Seleccionamos columnas relevantes para dar contexto a la IA
+    genai.configure(api_key=api_key)
+
     cols = [c for c in df_sum.columns if c in ["Organismo", "GC_promedio", "N_promedio", "Longitud_total_ACGT"]]
-    tabla_markdown = df_sum[cols].to_markdown(index=False)
+    tabla_texto = df_sum[cols].to_csv(index=False, sep="\t")
 
     prompt = f"""
-Eres un bioinformático experto en análisis de 16S rRNA y contenido GC.
 
-A continuación tienes una tabla de resumen por organismo, donde:
-- GC_promedio = porcentaje promedio de GC en el gen 16S rRNA.
-- N_promedio  = porcentaje promedio de bases ambiguas N.
-- Longitud_total_ACGT = suma de longitudes efectivas de las secuencias analizadas.
+A continuación tienes una tabla de resumen por organismo:
 
-Tabla de datos:
+{tabla_texto}
 
-{tabla_markdown}
-
-Con base en estos resultados, escribe una conclusión en ESPAÑOL que:
-1) Indique claramente qué organismo tiene el mayor %GC y cuál el menor.
-2) Describa el rango de variación del %GC entre los organismos.
-3) Comente brevemente qué implicaciones biológicas generales tiene un %GC más alto o más bajo
-   (estabilidad del ADN/ARN, genomas reducidos, nichos ecológicos, etc.).
-4) Use un tono adecuado para el cierre de un informe académico corto.
-5) Tenga entre 6 y 10 líneas de texto en un solo párrafo (no usar viñetas).
-
-No inventes organismos que no aparezcan en la tabla.
+Con base en estos resultados, escribe una conclusión en ESPAÑOL de 6 a 10 líneas que indique:
+- Qué organismo tiene el mayor %GC y cuál tiene el menor.
+- El rango de variación del %GC.
+- Implicaciones biológicas generales del %GC alto o bajo.
+- Tono académico.
 """
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # modelo ligero y rápido
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Eres un asistente experto en bioinformática y redacción científica."
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.4,
-            max_tokens=600,
-        )
-        # Nuevo SDK: el contenido está en message.content
-        texto = response.choices[0].message.content
-        return texto
+        model = genai.GenerativeModel("gemini-flash-latest")  # Modelo disponible confirmado
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        return f"No se pudo generar la conclusión con OpenAI (IA): {e}"
+        return f"No se pudo generar la conclusión con Gemini (IA): {e}"
 
 # -------------------------------------------------------------------
 # CONJUNTO DE ORGANISMOS DEL PROYECTO
@@ -583,23 +544,24 @@ with tab_conclusion:
         )
 
         st.markdown("---")
-        st.markdown("### 🤖 Conclusión generada por IA (OpenAI — gpt-4o-mini)")
+        st.markdown("### 🤖 Conclusión generada por IA (Gemini — modelo gemini-1.5-flash-latest)")
 
         if st.button("Generar conclusión con IA"):
-            texto_ia = generar_conclusion_openai(df_summary)
-            st.session_state["conclusion_openai"] = texto_ia
+            texto_ia = generar_conclusion_ia(df_summary)
+            st.session_state["conclusion_ia"] = texto_ia
 
-        if "conclusion_openai" in st.session_state:
-            st.markdown(st.session_state["conclusion_openai"])
+        if "conclusion_ia" in st.session_state:
+            st.markdown(st.session_state["conclusion_ia"])
             st.download_button(
                 "⬇️ Descargar conclusión IA (.txt)",
-                st.session_state["conclusion_openai"].encode("utf-8"),
-                "conclusion_gc_openai.txt",
+                st.session_state["conclusion_ia"].encode("utf-8"),
+                "conclusion_gc_gemini.txt",
                 "text/plain",
-                key="download_conclusion_openai",
+                key="download_conclusion_ia",
             )
         else:
             st.info(
-                "Pulsa el botón para que el agente de IA (OpenAI) genere una conclusión extensa "
+                "Pulsa el botón para que el agente de IA (Gemini) genere una conclusión extensa "
                 "a partir del resumen por organismo."
             )
+
